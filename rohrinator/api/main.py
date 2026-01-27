@@ -24,6 +24,7 @@ import cadquery as cq
 
 # Import generators (using absolute imports from rohrinator package)
 from models.straight import create_straight_assembly, get_straight_assembly_metadata
+from models.elbow import create_elbow_assembly, get_elbow_assembly_metadata
 from generators.flanges import list_available_flanges
 from generators.pipes import list_available_pipes
 
@@ -79,6 +80,48 @@ class StraightAssemblyRequest(BaseModel):
                 "nps": "2",
                 "pipe_schedule": "STD",
                 "face_to_face": 500.0,
+                "welding_gap": 3.0,
+            }
+        }
+
+
+class ElbowAssemblyRequest(BaseModel):
+    """Request model for creating an elbow (90°) pipe assembly."""
+
+    # Project info
+    project: Optional[str] = Field(None, description="Project name/number")
+    designation: Optional[str] = Field(None, description="Assembly designation")
+    description: Optional[str] = Field(None, description="Assembly description")
+
+    # Flange parameters
+    pressure_class: int = Field(150, description="ASME pressure class (150, 300, 600, 900, 1500, 2500)")
+    nps: str = Field("2", description="Nominal pipe size (e.g., '2', '1/2', '1-1/4')")
+
+    # Pipe parameters
+    pipe_schedule: str = Field("STD", description="Pipe schedule (e.g., 'STD', '40', '80', 'XS')")
+
+    # Dimensions
+    leg_a_length: float = Field(400.0, ge=200, le=5000, description="Length of leg A (flange face to elbow center) in mm")
+    leg_b_length: float = Field(400.0, ge=200, le=5000, description="Length of leg B (elbow center to flange face) in mm")
+
+    # Elbow parameters
+    bend_radius_factor: str = Field("3D", description="Elbow bend radius factor ('2D', '3D', '5D')")
+
+    # Options
+    welding_gap: float = Field(3.0, ge=0, le=10, description="Welding gap in mm")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "project": "Project-001",
+                "designation": "EL-001",
+                "description": "90° elbow spool NPS 2 Class 150",
+                "pressure_class": 150,
+                "nps": "2",
+                "pipe_schedule": "STD",
+                "leg_a_length": 400.0,
+                "leg_b_length": 400.0,
+                "bend_radius_factor": "3D",
                 "welding_gap": 3.0,
             }
         }
@@ -204,6 +247,85 @@ async def create_assembly_straight(request: StraightAssemblyRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate assembly: {str(e)}")
+
+
+@app.post("/api/v1/assembly/elbow", response_model=AssemblyResponse, tags=["Assembly"])
+async def create_assembly_elbow(request: ElbowAssemblyRequest):
+    """
+    Create an elbow (90°) pipe assembly.
+
+    Generates a 3D model of an L-shaped pipe with flanges at both ends
+    and a 90° elbow in the middle. Returns assembly ID and metadata.
+    Use the download endpoints to get STEP, STL, or BOM files.
+    """
+    # Generate unique ID
+    assembly_id = str(uuid.uuid4())[:8]
+    created_at = datetime.utcnow().isoformat() + "Z"
+
+    try:
+        # Generate the 3D model
+        assembly = create_elbow_assembly(
+            pressure_class=request.pressure_class,
+            nps=request.nps,
+            pipe_schedule=request.pipe_schedule,
+            leg_a_length=request.leg_a_length,
+            leg_b_length=request.leg_b_length,
+            bend_radius_factor=request.bend_radius_factor,
+            welding_gap=request.welding_gap,
+        )
+
+        # Get metadata
+        metadata = get_elbow_assembly_metadata(
+            pressure_class=request.pressure_class,
+            nps=request.nps,
+            pipe_schedule=request.pipe_schedule,
+            leg_a_length=request.leg_a_length,
+            leg_b_length=request.leg_b_length,
+            bend_radius_factor=request.bend_radius_factor,
+            welding_gap=request.welding_gap,
+        )
+
+        # Create storage directory for this assembly
+        assembly_dir = STORAGE_DIR / assembly_id
+        assembly_dir.mkdir(exist_ok=True)
+
+        # Export STEP file
+        step_path = assembly_dir / "assembly.step"
+        cq.exporters.export(assembly, str(step_path), exportType="STEP")
+
+        # Export STL file
+        stl_path = assembly_dir / "assembly.stl"
+        cq.exporters.export(assembly, str(stl_path), exportType="STL")
+
+        # Store metadata in cache
+        assembly_cache[assembly_id] = {
+            "created_at": created_at,
+            "project": request.project,
+            "designation": request.designation,
+            "description": request.description,
+            "metadata": metadata,
+            "step_path": str(step_path),
+            "stl_path": str(stl_path),
+        }
+
+        return AssemblyResponse(
+            id=assembly_id,
+            created_at=created_at,
+            project=request.project,
+            designation=request.designation,
+            description=request.description,
+            metadata=metadata,
+            download_urls={
+                "step": f"/api/v1/assembly/{assembly_id}/step",
+                "stl": f"/api/v1/assembly/{assembly_id}/stl",
+                "bom": f"/api/v1/assembly/{assembly_id}/bom",
+            },
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate elbow assembly: {str(e)}")
 
 
 @app.get("/api/v1/assembly/{assembly_id}/step", tags=["Download"])
