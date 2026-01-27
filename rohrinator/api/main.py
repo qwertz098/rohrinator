@@ -18,6 +18,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 import cadquery as cq
@@ -40,6 +41,9 @@ app = FastAPI(
 # Storage for generated assemblies (in production, use proper storage)
 STORAGE_DIR = Path(tempfile.gettempdir()) / "rohrinator"
 STORAGE_DIR.mkdir(exist_ok=True)
+
+# Static files directory
+STATIC_DIR = SCRIPT_DIR / "static"
 
 # In-memory cache for assembly metadata
 assembly_cache: dict = {}
@@ -152,6 +156,12 @@ class AvailableOptionsResponse(BaseModel):
 
 @app.get("/", tags=["Info"])
 async def root():
+    """Serve the web UI."""
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/api", tags=["Info"])
+async def api_info():
     """API root - basic info."""
     return {
         "name": "Rohrinator API",
@@ -415,3 +425,7 @@ async def get_assembly_info(assembly_id: str):
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "cadquery_available": True}
+
+
+# Mount static files (CSS, JS, etc.) - must be after API routes
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
