@@ -28,7 +28,7 @@ def create_pipe_elbow(
     id_override: Optional[float] = None,
 ) -> cq.Workplane:
     """
-    Create a pipe elbow.
+    Create a pipe elbow by sweeping pipe profile along a curved path.
 
     Args:
         nps: Nominal pipe size as string (e.g., "2", "1/2", "1-1/4")
@@ -45,40 +45,33 @@ def create_pipe_elbow(
     dims = get_pipe_dimensions(nps, schedule)
     od = od_override if od_override is not None else dims["od"]
     id_ = id_override if id_override is not None else dims["id"]
-    wall = (od - id_) / 2
+
+    r_pipe = od / 2  # Outer radius
+    r_inner = id_ / 2  # Inner radius
 
     # Calculate bend radius (center line radius)
     # Factor is based on nominal pipe OD: 2D = 2×D, 3D = 3×D, 5D = 5×D
     nominal_od = PIPE_OD[nps]
     factor_map = {"2D": 2.0, "3D": 3.0, "5D": 5.0}
     factor = factor_map.get(bend_radius_factor, 3.0)
-    bend_radius = nominal_od * factor  # Centerline bend radius = factor × nominal diameter
+    r_bend = nominal_od * factor  # Centerline bend radius = factor × nominal diameter
 
-    # Create elbow by making outer and inner torus sections, then subtracting
-    # This approach is more reliable than revolving an annulus
+    # Create path: arc for the bend
+    # For 90° elbow: quarter circle from (0,0) to (r_bend, r_bend)
+    if angle == 90.0:
+        path = cq.Workplane("XZ").radiusArc((r_bend, r_bend), r_bend)
+    else:
+        # General angle: end point calculation
+        end_x = r_bend * math.sin(math.radians(angle))
+        end_z = r_bend * (1 - math.cos(math.radians(angle)))
+        path = cq.Workplane("XZ").radiusArc((end_x, end_z), r_bend)
 
-    # Create outer torus section (solid)
-    outer = (
-        cq.Workplane("XY")
-        .center(bend_radius, 0)
-        .circle(od / 2)
-        .revolve(angle, (0, 0, 0), (0, 0, 1), clean=False)
-    )
+    # Sweep outer circle profile along path
+    outer = cq.Workplane("XY").circle(r_pipe).sweep(path, isFrenet=True)
 
-    # Create inner torus section (to cut out)
-    inner = (
-        cq.Workplane("XY")
-        .center(bend_radius, 0)
-        .circle(id_ / 2)
-        .revolve(angle, (0, 0, 0), (0, 0, 1), clean=False)
-    )
-
-    # Subtract inner from outer to create hollow elbow
+    # Sweep inner circle and subtract to make hollow pipe
+    inner = cq.Workplane("XY").circle(r_inner).sweep(path, isFrenet=True)
     elbow = outer.cut(inner)
-
-    # The elbow is now in XY plane:
-    # - Inlet at (bend_radius, 0, 0) pointing in -X direction
-    # - Outlet at (0, bend_radius, 0) pointing in +Y direction (for 90° bend)
 
     return elbow
 

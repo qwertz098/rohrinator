@@ -269,18 +269,30 @@ def generate_elbow_examples():
     from data.asme_b36_10 import PIPE_OD
 
     def create_pipe_elbow(nps="2", schedule="STD", angle=90.0, bend_radius_factor="3D", od_override=None, id_override=None):
-        """Create a pipe elbow."""
+        """Create a pipe elbow by sweeping pipe profile along curved path."""
         dims = get_pipe_dimensions(nps, schedule)
         od = od_override if od_override is not None else dims["od"]
         id_ = id_override if id_override is not None else dims["id"]
 
+        r_pipe = od / 2
+        r_inner = id_ / 2
+
         nominal_od = PIPE_OD[nps]
         factor_map = {"2D": 2.0, "3D": 3.0, "5D": 5.0}
         factor = factor_map.get(bend_radius_factor, 3.0)
-        bend_radius = nominal_od * factor  # Centerline bend radius = factor × nominal diameter
+        r_bend = nominal_od * factor  # Centerline bend radius = factor × nominal diameter
 
-        outer = cq.Workplane("XY").center(bend_radius, 0).circle(od / 2).revolve(angle, (0, 0, 0), (0, 0, 1), clean=False)
-        inner = cq.Workplane("XY").center(bend_radius, 0).circle(id_ / 2).revolve(angle, (0, 0, 0), (0, 0, 1), clean=False)
+        # Create arc path for the bend
+        if angle == 90.0:
+            path = cq.Workplane("XZ").radiusArc((r_bend, r_bend), r_bend)
+        else:
+            end_x = r_bend * math.sin(math.radians(angle))
+            end_z = r_bend * (1 - math.cos(math.radians(angle)))
+            path = cq.Workplane("XZ").radiusArc((end_x, end_z), r_bend)
+
+        # Sweep outer and inner profiles, then subtract
+        outer = cq.Workplane("XY").circle(r_pipe).sweep(path, isFrenet=True)
+        inner = cq.Workplane("XY").circle(r_inner).sweep(path, isFrenet=True)
         elbow = outer.cut(inner)
         return elbow
 
