@@ -48,11 +48,11 @@ def create_pipe_elbow(
     wall = (od - id_) / 2
 
     # Calculate bend radius (center line radius)
-    # Factor is based on nominal pipe OD
+    # Factor is based on nominal pipe OD: 2D = 2×D, 3D = 3×D, 5D = 5×D
     nominal_od = PIPE_OD[nps]
     factor_map = {"2D": 2.0, "3D": 3.0, "5D": 5.0}
     factor = factor_map.get(bend_radius_factor, 3.0)
-    bend_radius = nominal_od * factor / 2  # Radius to centerline
+    bend_radius = nominal_od * factor  # Centerline bend radius = factor × nominal diameter
 
     # Create elbow by making outer and inner torus sections, then subtracting
     # This approach is more reliable than revolving an annulus
@@ -118,7 +118,7 @@ def create_elbow_with_extensions(
     nominal_od = PIPE_OD[nps]
     factor_map = {"2D": 2.0, "3D": 3.0, "5D": 5.0}
     factor = factor_map.get(bend_radius_factor, 3.0)
-    bend_radius = nominal_od * factor / 2
+    bend_radius = nominal_od * factor  # Centerline bend radius = factor × nominal diameter
 
     # Create the main elbow
     elbow = create_pipe_elbow(nps, schedule, angle, bend_radius_factor, od, id_)
@@ -166,7 +166,7 @@ def get_elbow_dimensions(
 
     factor_map = {"2D": 2.0, "3D": 3.0, "5D": 5.0}
     factor = factor_map.get(bend_radius_factor, 3.0)
-    bend_radius = nominal_od * factor / 2
+    bend_radius = nominal_od * factor  # Centerline bend radius = factor × nominal diameter
 
     # Arc length along centerline
     arc_length = 2 * math.pi * bend_radius * (angle / 360)

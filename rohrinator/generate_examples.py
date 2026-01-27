@@ -277,7 +277,7 @@ def generate_elbow_examples():
         nominal_od = PIPE_OD[nps]
         factor_map = {"2D": 2.0, "3D": 3.0, "5D": 5.0}
         factor = factor_map.get(bend_radius_factor, 3.0)
-        bend_radius = nominal_od * factor / 2
+        bend_radius = nominal_od * factor  # Centerline bend radius = factor × nominal diameter
 
         outer = cq.Workplane("XY").center(bend_radius, 0).circle(od / 2).revolve(angle, (0, 0, 0), (0, 0, 1), clean=False)
         inner = cq.Workplane("XY").center(bend_radius, 0).circle(id_ / 2).revolve(angle, (0, 0, 0), (0, 0, 1), clean=False)
@@ -289,7 +289,7 @@ def generate_elbow_examples():
         nominal_od = PIPE_OD[nps]
         factor_map = {"2D": 2.0, "3D": 3.0, "5D": 5.0}
         factor = factor_map.get(bend_radius_factor, 3.0)
-        bend_radius = nominal_od * factor / 2
+        bend_radius = nominal_od * factor  # Centerline bend radius = factor × nominal diameter
         arc_length = 2 * math.pi * bend_radius * (angle / 360)
         return {"od": dims["od"], "id": dims["id"], "bend_radius": bend_radius, "arc_length": arc_length}
 
@@ -358,9 +358,9 @@ def generate_elbow_examples():
         return assembly
 
     configs = [
-        {"nps": "2", "pressure_class": 150, "leg_a": 400, "leg_b": 400, "bend_radius_factor": "3D"},
-        {"nps": "4", "pressure_class": 150, "leg_a": 500, "leg_b": 600, "bend_radius_factor": "3D"},
-        {"nps": "2", "pressure_class": 150, "leg_a": 400, "leg_b": 400, "bend_radius_factor": "5D"},
+        {"nps": "2", "pressure_class": 150, "leg_a": 500, "leg_b": 500, "bend_radius_factor": "3D"},
+        {"nps": "4", "pressure_class": 150, "leg_a": 700, "leg_b": 800, "bend_radius_factor": "3D"},
+        {"nps": "2", "pressure_class": 150, "leg_a": 600, "leg_b": 600, "bend_radius_factor": "5D"},
     ]
 
     for i, cfg in enumerate(configs, 1):
