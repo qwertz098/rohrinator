@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  rohrinator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rohrinator
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persist generated files
+      - rohrinator_data:/tmp/rohrinator
+    environment:
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # Watchtower for automatic updates (optional)
+  # Uncomment if you want auto-updates when you push to the repo
+  # watchtower:
+  #   image: containrrr/watchtower
+  #   container_name: watchtower
+  #   restart: unless-stopped
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #   environment:
+  #     - WATCHTOWER_CLEANUP=true
+  #     - WATCHTOWER_POLL_INTERVAL=300
+  #     - WATCHTOWER_LABEL_ENABLE=true
+  #   command: --interval 300
+
+volumes:
+  rohrinator_data:

@@ -1,0 +1,90 @@
+version: '3.8'
+
+# Alternative setup that automatically pulls from git repository
+# Usage: docker-compose -f docker-compose.git-pull.yml up -d
+
+services:
+  rohrinator:
+    image: python:3.11-slim
+    container_name: rohrinator
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - rohrinator_app:/app
+      - rohrinator_data:/tmp/rohrinator
+    environment:
+      - PYTHONUNBUFFERED=1
+      - GIT_REPO=https://github.com/YOUR_USERNAME/rohrinator.git
+      - GIT_BRANCH=main
+    entrypoint: /bin/bash
+    command: |
+      -c '
+      set -e
+
+      # Install dependencies
+      apt-get update && apt-get install -y --no-install-recommends git libgl1-mesa-glx libglu1-mesa libxrender1 libsm6 libice6 libxt6
+      pip install --no-cache-dir cadquery fastapi "uvicorn[standard]" pydantic
+
+      # Clone or pull repo
+      if [ -d "/app/rohrinator" ]; then
+        cd /app && git pull origin $${GIT_BRANCH:-main}
+      else
+        git clone --branch $${GIT_BRANCH:-main} --single-branch $${GIT_REPO} /app
+      fi
+
+      cd /app
+
+      # Start server
+      exec python -m uvicorn rohrinator.api.main:app --host 0.0.0.0 --port 8000
+      '
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Auto-updater - pulls from git and restarts on schedule
+  updater:
+    image: alpine:latest
+    container_name: rohrinator-updater
+    restart: unless-stopped
+    volumes:
+      - rohrinator_app:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - GIT_REPO=https://github.com/YOUR_USERNAME/rohrinator.git
+      - GIT_BRANCH=main
+      - UPDATE_INTERVAL=300  # Check every 5 minutes
+    entrypoint: /bin/sh
+    command: |
+      -c '
+      apk add --no-cache git docker-cli
+
+      while true; do
+        echo "[$(date)] Checking for updates..."
+
+        if [ -d "/app/.git" ]; then
+          cd /app
+          git fetch origin $${GIT_BRANCH:-main}
+
+          LOCAL=$(git rev-parse HEAD)
+          REMOTE=$(git rev-parse origin/$${GIT_BRANCH:-main})
+
+          if [ "$$LOCAL" != "$$REMOTE" ]; then
+            echo "[$(date)] Updates found, pulling and restarting..."
+            git pull origin $${GIT_BRANCH:-main}
+            docker restart rohrinator
+          else
+            echo "[$(date)] No updates"
+          fi
+        fi
+
+        sleep $${UPDATE_INTERVAL:-300}
+      done
+      '
+
+volumes:
+  rohrinator_app:
+  rohrinator_data:

@@ -1,0 +1,42 @@
+# Rohrinator - Build from Git repository
+# Usage: docker build -f Dockerfile.gitclone --build-arg GIT_REPO=https://github.com/user/rohrinator.git -t rohrinator .
+
+ARG GIT_REPO=https://github.com/YOUR_USERNAME/rohrinator.git
+ARG GIT_BRANCH=main
+
+FROM python:3.11-slim
+
+# Install dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1-mesa-glx \
+    libglu1-mesa \
+    libxrender1 \
+    libsm6 \
+    libice6 \
+    libxt6 \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python packages
+RUN pip install --no-cache-dir \
+    cadquery \
+    fastapi \
+    "uvicorn[standard]" \
+    pydantic
+
+# Clone repository
+ARG GIT_REPO
+ARG GIT_BRANCH
+RUN git clone --branch ${GIT_BRANCH} --single-branch --depth 1 ${GIT_REPO} /app
+
+WORKDIR /app
+
+# Create temp directory
+RUN mkdir -p /tmp/rohrinator
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
+
+CMD ["python", "-m", "uvicorn", "rohrinator.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
