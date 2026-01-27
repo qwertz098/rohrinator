@@ -26,6 +26,8 @@ def create_pipe_elbow(
     bend_radius_factor: Literal["2D", "3D", "5D"] = "3D",
     od_override: Optional[float] = None,
     id_override: Optional[float] = None,
+    chamfer_angle: float = 37.5,
+    welding_gap: float = 3.0,
 ) -> cq.Workplane:
     """
     Create a pipe elbow by sweeping pipe profile along a curved path.
@@ -37,6 +39,8 @@ def create_pipe_elbow(
         bend_radius_factor: Bend radius as multiple of nominal diameter ("2D", "3D", "5D")
         od_override: Override outer diameter (mm)
         id_override: Override inner diameter (mm)
+        chamfer_angle: Weld prep bevel angle in degrees (default 37.5°)
+        welding_gap: Root gap for welding (mm)
 
     Returns:
         CadQuery Workplane containing the elbow solid
@@ -48,6 +52,7 @@ def create_pipe_elbow(
 
     r_pipe = od / 2  # Outer radius
     r_inner = id_ / 2  # Inner radius
+    wall = r_pipe - r_inner
 
     # Calculate bend radius (center line radius)
     # Factor is based on nominal pipe OD: 2D = 2×D, 3D = 3×D, 5D = 5×D
@@ -55,6 +60,13 @@ def create_pipe_elbow(
     factor_map = {"2D": 2.0, "3D": 3.0, "5D": 5.0}
     factor = factor_map.get(bend_radius_factor, 3.0)
     r_bend = nominal_od * factor  # Centerline bend radius = factor × nominal diameter
+
+    # Calculate chamfer depth based on wall thickness and angle
+    # Chamfer goes from OD down toward ID at 37.5°
+    # Leave a small land (root face) at the ID for welding
+    root_face = min(1.6, wall * 0.2)  # ~1.6mm or 20% of wall, whichever is smaller
+    chamfer_depth = wall - root_face
+    chamfer_height = chamfer_depth * math.tan(math.radians(chamfer_angle))
 
     # Create path: arc for the bend
     # For 90° elbow: quarter circle from (0,0) to (r_bend, r_bend)
@@ -72,6 +84,71 @@ def create_pipe_elbow(
     # Sweep inner circle and subtract to make hollow pipe
     inner = cq.Workplane("XY").circle(r_inner).sweep(path, isFrenet=True)
     elbow = outer.cut(inner)
+
+    # Add 37.5° chamfer at inlet end (at origin, facing -X direction)
+    # Create a cone-shaped cut for the bevel
+    chamfer_inlet = (
+        cq.Workplane("XY")
+        .circle(r_pipe + 1)  # Slightly larger to ensure clean cut
+        .circle(r_inner + root_face)  # Leave root face
+        .extrude(-chamfer_height - welding_gap / 2)
+    )
+    # Create the angled bevel using a cone
+    bevel_inlet = (
+        cq.Workplane("XY")
+        .transformed(offset=(0, 0, -welding_gap / 2))
+        .circle(r_pipe)
+        .workplane(offset=-chamfer_height)
+        .circle(r_inner + root_face)
+        .loft()
+    )
+    # Cut flat end and add bevel
+    elbow = elbow.cut(chamfer_inlet)
+    elbow = elbow.union(bevel_inlet)
+
+    # Add 37.5° chamfer at outlet end
+    # For 90° elbow, outlet is at (r_bend, 0, r_bend) facing +Z direction
+    if angle == 90.0:
+        chamfer_outlet = (
+            cq.Workplane("XY")
+            .transformed(offset=(r_bend, 0, r_bend))
+            .circle(r_pipe + 1)
+            .circle(r_inner + root_face)
+            .extrude(chamfer_height + welding_gap / 2)
+        )
+        bevel_outlet = (
+            cq.Workplane("XY")
+            .transformed(offset=(r_bend, 0, r_bend + welding_gap / 2))
+            .circle(r_pipe)
+            .workplane(offset=chamfer_height)
+            .circle(r_inner + root_face)
+            .loft()
+        )
+        elbow = elbow.cut(chamfer_outlet)
+        elbow = elbow.union(bevel_outlet)
+    else:
+        # General angle outlet position
+        end_x = r_bend * math.sin(math.radians(angle))
+        end_z = r_bend * (1 - math.cos(math.radians(angle)))
+        # Rotate chamfer to match outlet angle
+        chamfer_outlet = (
+            cq.Workplane("XY")
+            .transformed(offset=(end_x, 0, end_z), rotate=(0, -angle, 0))
+            .circle(r_pipe + 1)
+            .circle(r_inner + root_face)
+            .extrude(chamfer_height + welding_gap / 2)
+        )
+        bevel_outlet = (
+            cq.Workplane("XY")
+            .transformed(offset=(end_x, 0, end_z), rotate=(0, -angle, 0))
+            .transformed(offset=(0, 0, welding_gap / 2))
+            .circle(r_pipe)
+            .workplane(offset=chamfer_height)
+            .circle(r_inner + root_face)
+            .loft()
+        )
+        elbow = elbow.cut(chamfer_outlet)
+        elbow = elbow.union(bevel_outlet)
 
     return elbow
 

@@ -268,21 +268,28 @@ def generate_elbow_examples():
 
     from data.asme_b36_10 import PIPE_OD
 
-    def create_pipe_elbow(nps="2", schedule="STD", angle=90.0, bend_radius_factor="3D", od_override=None, id_override=None):
-        """Create a pipe elbow by sweeping pipe profile along curved path."""
+    def create_pipe_elbow(nps="2", schedule="STD", angle=90.0, bend_radius_factor="3D", od_override=None, id_override=None, welding_gap=3.0):
+        """Create a pipe elbow with 37.5° weld prep chamfers."""
         dims = get_pipe_dimensions(nps, schedule)
         od = od_override if od_override is not None else dims["od"]
         id_ = id_override if id_override is not None else dims["id"]
 
         r_pipe = od / 2
         r_inner = id_ / 2
+        wall = r_pipe - r_inner
 
         nominal_od = PIPE_OD[nps]
         factor_map = {"2D": 2.0, "3D": 3.0, "5D": 5.0}
         factor = factor_map.get(bend_radius_factor, 3.0)
-        r_bend = nominal_od * factor  # Centerline bend radius = factor × nominal diameter
+        r_bend = nominal_od * factor
 
-        # Create arc path for the bend
+        # Chamfer parameters: 37.5° bevel with root face
+        chamfer_angle = 37.5
+        root_face = min(1.6, wall * 0.2)
+        chamfer_depth = wall - root_face
+        chamfer_height = chamfer_depth * math.tan(math.radians(chamfer_angle))
+
+        # Create arc path
         if angle == 90.0:
             path = cq.Workplane("XZ").radiusArc((r_bend, r_bend), r_bend)
         else:
@@ -290,10 +297,47 @@ def generate_elbow_examples():
             end_z = r_bend * (1 - math.cos(math.radians(angle)))
             path = cq.Workplane("XZ").radiusArc((end_x, end_z), r_bend)
 
-        # Sweep outer and inner profiles, then subtract
+        # Sweep profiles
         outer = cq.Workplane("XY").circle(r_pipe).sweep(path, isFrenet=True)
         inner = cq.Workplane("XY").circle(r_inner).sweep(path, isFrenet=True)
         elbow = outer.cut(inner)
+
+        # Inlet chamfer (at origin)
+        chamfer_inlet = (
+            cq.Workplane("XY")
+            .circle(r_pipe + 1)
+            .circle(r_inner + root_face)
+            .extrude(-chamfer_height - welding_gap / 2)
+        )
+        bevel_inlet = (
+            cq.Workplane("XY")
+            .transformed(offset=(0, 0, -welding_gap / 2))
+            .circle(r_pipe)
+            .workplane(offset=-chamfer_height)
+            .circle(r_inner + root_face)
+            .loft()
+        )
+        elbow = elbow.cut(chamfer_inlet).union(bevel_inlet)
+
+        # Outlet chamfer (at r_bend, 0, r_bend for 90°)
+        if angle == 90.0:
+            chamfer_outlet = (
+                cq.Workplane("XY")
+                .transformed(offset=(r_bend, 0, r_bend))
+                .circle(r_pipe + 1)
+                .circle(r_inner + root_face)
+                .extrude(chamfer_height + welding_gap / 2)
+            )
+            bevel_outlet = (
+                cq.Workplane("XY")
+                .transformed(offset=(r_bend, 0, r_bend + welding_gap / 2))
+                .circle(r_pipe)
+                .workplane(offset=chamfer_height)
+                .circle(r_inner + root_face)
+                .loft()
+            )
+            elbow = elbow.cut(chamfer_outlet).union(bevel_outlet)
+
         return elbow
 
     def get_elbow_dimensions(nps, schedule, angle, bend_radius_factor):
@@ -343,8 +387,8 @@ def generate_elbow_examples():
         pipe_a = create_pipe_section_simple(od, id_, pipe_a_length)
         pipe_a = pipe_a.translate((0, 0, pipe_a_start))
 
-        # Elbow
-        elbow = create_pipe_elbow(nps, pipe_schedule, 90.0, bend_radius_factor, od, id_)
+        # Elbow with 37.5° chamfers
+        elbow = create_pipe_elbow(nps, pipe_schedule, 90.0, bend_radius_factor, od, id_, welding_gap)
         elbow = elbow.rotate((0, 0, 0), (0, 1, 0), 90)
         elbow_inlet_z = pipe_a_start + pipe_a_length + welding_gap
         elbow = elbow.translate((0, 0, elbow_inlet_z - bend_radius))
