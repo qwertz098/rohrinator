@@ -5,9 +5,17 @@ Creates ASME B16.5 weld neck flanges using CadQuery based on
 standard dimensions from the data module.
 """
 
+import sys
+from pathlib import Path
+
+# Setup path for imports
+_SCRIPT_DIR = Path(__file__).parent.parent
+if str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
+
 import cadquery as cq
 from typing import Optional
-from ..data.asme_b16_5 import get_flange_dimensions, PRESSURE_CLASSES, AVAILABLE_SIZES
+from data.asme_b16_5 import get_flange_dimensions, PRESSURE_CLASSES, AVAILABLE_SIZES
 
 
 def create_weld_neck_flange(

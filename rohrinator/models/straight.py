@@ -10,12 +10,21 @@ The assembly is oriented along the Z axis with Flange A at Z=0
 (raised face pointing in +Z direction).
 """
 
+import os
+import sys
+from pathlib import Path
+
+# Setup path for imports
+_SCRIPT_DIR = Path(__file__).parent.parent
+if str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
+
 import cadquery as cq
 from typing import Optional
-from ..generators.flanges import create_weld_neck_flange, get_flange_metadata
-from ..generators.pipes import create_pipe_section_simple, get_pipe_metadata
-from ..data.asme_b16_5 import get_flange_dimensions
-from ..data.asme_b36_10 import get_pipe_dimensions
+from generators.flanges import create_weld_neck_flange, get_flange_metadata
+from generators.pipes import create_pipe_section_simple, get_pipe_metadata
+from data.asme_b16_5 import get_flange_dimensions
+from data.asme_b36_10 import get_pipe_dimensions
 
 
 def create_straight_assembly(

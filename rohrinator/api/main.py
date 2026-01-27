@@ -5,11 +5,16 @@ REST API for generating 3D pipe assembly models.
 """
 
 import os
+import sys
 import uuid
 import tempfile
 from pathlib import Path
 from typing import Optional
 from datetime import datetime
+
+# Setup path for imports
+SCRIPT_DIR = Path(__file__).parent.parent
+sys.path.insert(0, str(SCRIPT_DIR))
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
@@ -17,10 +22,10 @@ from pydantic import BaseModel, Field
 
 import cadquery as cq
 
-# Import generators
-from ..models.straight import create_straight_assembly, get_straight_assembly_metadata
-from ..generators.flanges import list_available_flanges
-from ..generators.pipes import list_available_pipes
+# Import generators (using absolute imports from rohrinator package)
+from models.straight import create_straight_assembly, get_straight_assembly_metadata
+from generators.flanges import list_available_flanges
+from generators.pipes import list_available_pipes
 
 # Create FastAPI app
 app = FastAPI(

@@ -5,9 +5,17 @@ Creates pipe sections using CadQuery based on ASME B36.10 dimensions.
 Pipes can have weld preparation chamfers at the ends.
 """
 
+import sys
+from pathlib import Path
+
+# Setup path for imports
+_SCRIPT_DIR = Path(__file__).parent.parent
+if str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
+
 import cadquery as cq
 from typing import Optional
-from ..data.asme_b36_10 import get_pipe_dimensions, get_available_schedules, PIPE_OD
+from data.asme_b36_10 import get_pipe_dimensions, get_available_schedules, PIPE_OD
 
 
 def create_pipe_section(
