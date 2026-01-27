@@ -77,18 +77,23 @@ def create_straight_assembly(
 
     # Pipe length calculation
     # Face to face is measured from raised face to raised face
-    # Pipe connects at the weld prep ends of the flange necks
+    # Each flange occupies: RF_height + flange_thickness + neck_length
+    # Pipe connects between the neck ends with welding gaps
+    flange_a_total = flange_a_rf_height + flange_a_thickness + flange_a_neck_length
+    flange_b_total = flange_b_rf_height + flange_b_thickness + flange_b_neck_length
+
     pipe_length = (
         face_to_face
-        - flange_a_rf_height  # Subtract RF height of flange A
-        - flange_b_rf_height  # Subtract RF height of flange B
+        - flange_a_total      # Full length of flange A
+        - flange_b_total      # Full length of flange B
         - 2 * welding_gap     # Welding gaps at both ends
     )
 
     if pipe_length < 0:
+        min_required = flange_a_total + flange_b_total + 2 * welding_gap + 50
         raise ValueError(
             f"Face-to-face distance {face_to_face}mm is too short for this configuration. "
-            f"Minimum required: {flange_a_rf_height + flange_b_rf_height + 2 * welding_gap + 50}mm"
+            f"Minimum required: {min_required}mm"
         )
 
     # Create Flange A
@@ -165,11 +170,13 @@ def get_straight_assembly_metadata(
     dims_b = get_flange_dimensions(class_b, nps)
     pipe_dims = get_pipe_dimensions(nps, pipe_schedule)
 
-    # Calculate pipe length
+    # Calculate pipe length (must match create_straight_assembly calculation)
+    flange_a_total = dims_a["raised_face_height"] + dims_a["flange_thickness"] + dims_a["neck_length"]
+    flange_b_total = dims_b["raised_face_height"] + dims_b["flange_thickness"] + dims_b["neck_length"]
     pipe_length = (
         face_to_face
-        - dims_a["raised_face_height"]
-        - dims_b["raised_face_height"]
+        - flange_a_total
+        - flange_b_total
         - 2 * welding_gap
     )
 

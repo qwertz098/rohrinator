@@ -164,9 +164,11 @@ def create_straight_assembly(pressure_class=150, nps="2", pipe_schedule="STD",
     flange_neck_length = dims["neck_length"]
 
     # Calculate pipe length
-    pipe_length = face_to_face - 2 * flange_rf_height - 2 * welding_gap
+    # Face-to-face minus full flange lengths (RF + thickness + neck) and weld gaps
+    flange_total = flange_rf_height + flange_thickness + flange_neck_length
+    pipe_length = face_to_face - 2 * flange_total - 2 * welding_gap
     if pipe_length < 0:
-        raise ValueError(f"Face-to-face {face_to_face}mm too short")
+        raise ValueError(f"Face-to-face {face_to_face}mm too short (min: {2 * flange_total + 2 * welding_gap + 50}mm)")
 
     # Create Flange A (rotated so RF faces +Z)
     flange_a = create_weld_neck_flange(pressure_class, nps, pipe_dims["id"], welding_gap)
@@ -178,8 +180,8 @@ def create_straight_assembly(pressure_class=150, nps="2", pipe_schedule="STD",
     flange_b_z = face_to_face - flange_rf_height - flange_thickness
     flange_b = flange_b.translate((0, 0, flange_b_z))
 
-    # Create pipe section
-    pipe_z_start = flange_thickness + flange_neck_length + welding_gap
+    # Create pipe section - starts after flange A neck end + weld gap
+    pipe_z_start = flange_thickness + flange_rf_height + flange_neck_length + welding_gap
     pipe = create_pipe_section(nps, pipe_schedule, pipe_length, pipe_dims["od"], pipe_dims["id"])
     pipe = pipe.translate((0, 0, pipe_z_start))
 
@@ -193,7 +195,8 @@ def get_assembly_metadata(pressure_class=150, nps="2", pipe_schedule="STD",
     """Get metadata for an assembly."""
     dims = get_flange_dimensions(pressure_class, nps)
     pipe_dims = get_pipe_dimensions(nps, pipe_schedule)
-    pipe_length = face_to_face - 2 * dims["raised_face_height"] - 2 * welding_gap
+    flange_total = dims["raised_face_height"] + dims["flange_thickness"] + dims["neck_length"]
+    pipe_length = face_to_face - 2 * flange_total - 2 * welding_gap
 
     return {
         "type": "straight_assembly",
