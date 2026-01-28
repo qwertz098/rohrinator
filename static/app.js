@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initThreeJS();
     initEventListeners();
     updateFormVisibility();
+    updateReducerVisibility();
 });
 
 // Initialize Three.js scene
@@ -102,11 +103,15 @@ function initEventListeners() {
     }
 
     // Update reducer visibility based on flange sizes
-    document.getElementById('nps-a')?.addEventListener('change', updateReducerVisibility);
-    document.getElementById('nps-b')?.addEventListener('change', updateReducerVisibility);
+    const npsASelect = document.getElementById('nps-a');
+    const npsBSelect = document.getElementById('nps-b');
 
-    // Initial visibility check
-    updateReducerVisibility();
+    if (npsASelect) {
+        npsASelect.addEventListener('change', updateReducerVisibility);
+    }
+    if (npsBSelect) {
+        npsBSelect.addEventListener('change', updateReducerVisibility);
+    }
 }
 
 // Update reducer position label
@@ -120,14 +125,21 @@ function updateReducerPositionLabel() {
 
 // Show/hide reducer position based on flange sizes
 function updateReducerVisibility() {
-    const npsA = document.getElementById('nps-a')?.value;
-    const npsB = document.getElementById('nps-b')?.value;
+    const npsASelect = document.getElementById('nps-a');
+    const npsBSelect = document.getElementById('nps-b');
     const reducerGroup = document.getElementById('reducer-position-group');
+    const defaultNps = document.getElementById('nps').value;
 
-    if (reducerGroup) {
+    if (reducerGroup && npsASelect && npsBSelect) {
+        // Get effective NPS values (use default if empty)
+        const npsA = npsASelect.value || defaultNps;
+        const npsB = npsBSelect.value || defaultNps;
+
         // Show reducer position only if sizes are different
-        const needsReducer = npsA && npsB && npsA !== npsB;
+        const needsReducer = npsA !== npsB;
         reducerGroup.style.display = needsReducer ? 'block' : 'none';
+
+        console.log('Reducer visibility:', { npsA, npsB, needsReducer });
     }
 }
 
@@ -165,7 +177,7 @@ async function generateAssembly() {
         const commonParams = {
             project: document.getElementById('project').value,
             designation: document.getElementById('designation').value,
-            description: `${assemblyType === 'straight' ? 'Straight' : '90° Elbow'} Pipe Assembly`,
+            description: `${assemblyType === 'straight' ? 'Straight' : '90 Elbow'} Pipe Assembly`,
             pressure_class: parseInt(document.getElementById('pressure-class').value),
             nps: document.getElementById('nps').value,
             pipe_schedule: document.getElementById('schedule').value,
@@ -175,17 +187,28 @@ async function generateAssembly() {
         if (assemblyType === 'straight') {
             endpoint = `${API_BASE}/assembly/straight`;
 
-            // Get flange sizes
-            const npsA = document.getElementById('nps-a')?.value || null;
-            const npsB = document.getElementById('nps-b')?.value || null;
+            // Get flange sizes - use actual values, empty string becomes null
+            const npsASelect = document.getElementById('nps-a');
+            const npsBSelect = document.getElementById('nps-b');
+            const reducerPosSlider = document.getElementById('reducer-position');
+
+            // Get values - empty string means use default (null)
+            const npsA = npsASelect && npsASelect.value ? npsASelect.value : null;
+            const npsB = npsBSelect && npsBSelect.value ? npsBSelect.value : null;
+            const reducerPosition = reducerPosSlider ? parseFloat(reducerPosSlider.value) : 0.5;
 
             payload = {
                 ...commonParams,
                 face_to_face: parseFloat(document.getElementById('face-to-face').value),
-                nps_a: npsA || null,
-                nps_b: npsB || null,
-                reducer_position: parseFloat(document.getElementById('reducer-position')?.value || 0.5)
+                nps_a: npsA,
+                nps_b: npsB,
+                reducer_position: reducerPosition
             };
+
+            console.log('Straight assembly request:');
+            console.log('  nps_a:', npsA);
+            console.log('  nps_b:', npsB);
+            console.log('  reducer_position:', reducerPosition);
         } else {
             endpoint = `${API_BASE}/assembly/elbow`;
             payload = {
@@ -195,6 +218,10 @@ async function generateAssembly() {
                 bend_radius_factor: document.getElementById('bend-radius').value
             };
         }
+
+        // Debug: log the full payload
+        console.log('API Endpoint:', endpoint);
+        console.log('API Payload:', JSON.stringify(payload, null, 2));
 
         // Call API
         const response = await fetch(endpoint, {
@@ -211,6 +238,10 @@ async function generateAssembly() {
         }
 
         currentAssembly = await response.json();
+
+        // Debug: log response
+        console.log('API Response:', currentAssembly);
+        console.log('Has reducer:', currentAssembly.metadata?.configuration?.has_reducer);
 
         // Update downloads
         updateDownloadLinks(currentAssembly);
