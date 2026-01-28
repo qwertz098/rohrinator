@@ -1,0 +1,310 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: #1a1a2e;
+    color: #eee;
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+header {
+    text-align: center;
+    padding: 20px 0 30px;
+    border-bottom: 1px solid #333;
+    margin-bottom: 30px;
+}
+
+header h1 {
+    font-size: 2.5rem;
+    color: #4dabf7;
+    margin-bottom: 5px;
+}
+
+header p {
+    color: #888;
+    font-size: 1.1rem;
+}
+
+.main-content {
+    display: grid;
+    grid-template-columns: 350px 1fr;
+    gap: 30px;
+}
+
+/* Configuration Panel */
+.config-panel {
+    background: #16213e;
+    border-radius: 12px;
+    padding: 25px;
+    height: fit-content;
+}
+
+.config-panel h2 {
+    font-size: 1.3rem;
+    margin-bottom: 20px;
+    color: #4dabf7;
+}
+
+.form-section {
+    margin-bottom: 25px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #333;
+}
+
+.form-section:last-of-type {
+    border-bottom: none;
+}
+
+.form-section h3 {
+    font-size: 0.95rem;
+    color: #888;
+    margin-bottom: 15px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 0.9rem;
+    color: #aaa;
+    margin-bottom: 6px;
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #333;
+    border-radius: 6px;
+    background: #0f0f23;
+    color: #eee;
+    font-size: 0.95rem;
+    transition: border-color 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #4dabf7;
+}
+
+.form-group select option {
+    background: #0f0f23;
+}
+
+/* Buttons */
+.btn {
+    display: inline-block;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    text-align: center;
+}
+
+.btn-primary {
+    background: #4dabf7;
+    color: #000;
+    font-weight: 600;
+    width: 100%;
+}
+
+.btn-primary:hover {
+    background: #339af0;
+}
+
+.btn-primary:disabled {
+    background: #555;
+    cursor: not-allowed;
+}
+
+.btn-download {
+    background: #2d3748;
+    color: #eee;
+    margin: 5px 5px 5px 0;
+    padding: 10px 16px;
+    font-size: 0.85rem;
+}
+
+.btn-download:hover {
+    background: #4a5568;
+}
+
+.btn-small {
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    background: #2d3748;
+    color: #eee;
+}
+
+.btn-small:hover {
+    background: #4a5568;
+}
+
+.actions {
+    margin-top: 20px;
+}
+
+.downloads {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #333;
+}
+
+.downloads h3 {
+    font-size: 0.9rem;
+    color: #888;
+    margin-bottom: 10px;
+}
+
+/* Preview Panel */
+.preview-panel {
+    background: #16213e;
+    border-radius: 12px;
+    padding: 25px;
+}
+
+.preview-panel h2 {
+    font-size: 1.3rem;
+    margin-bottom: 20px;
+    color: #4dabf7;
+}
+
+#viewer-container {
+    position: relative;
+    width: 100%;
+    height: 500px;
+    background: #0f0f23;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+#viewer {
+    width: 100%;
+    height: 100%;
+}
+
+.viewer-controls {
+    margin-top: 15px;
+    display: flex;
+    gap: 10px;
+}
+
+/* Loading Spinner */
+.loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    z-index: 10;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #333;
+    border-top-color: #4dabf7;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Status Messages */
+.status {
+    margin-top: 15px;
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.status.success {
+    background: rgba(72, 187, 120, 0.2);
+    color: #48bb78;
+}
+
+.status.error {
+    background: rgba(245, 101, 101, 0.2);
+    color: #f56565;
+}
+
+.status:empty {
+    display: none;
+}
+
+/* Assembly Info */
+.assembly-info {
+    margin-top: 30px;
+    background: #16213e;
+    border-radius: 12px;
+    padding: 25px;
+}
+
+.assembly-info h3 {
+    font-size: 1.1rem;
+    color: #4dabf7;
+    margin-bottom: 15px;
+}
+
+#bom-table {
+    overflow-x: auto;
+}
+
+#bom-table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+#bom-table th,
+#bom-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #333;
+}
+
+#bom-table th {
+    background: #0f0f23;
+    color: #888;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+}
+
+#bom-table tr:hover {
+    background: rgba(77, 171, 247, 0.1);
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+    .main-content {
+        grid-template-columns: 1fr;
+    }
+
+    #viewer-container {
+        height: 400px;
+    }
+}
