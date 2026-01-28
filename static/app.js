@@ -94,6 +94,41 @@ function initEventListeners() {
     // Viewer controls
     document.getElementById('reset-view').addEventListener('click', resetView);
     document.getElementById('toggle-wireframe').addEventListener('click', toggleWireframe);
+
+    // Reducer position slider
+    const reducerSlider = document.getElementById('reducer-position');
+    if (reducerSlider) {
+        reducerSlider.addEventListener('input', updateReducerPositionLabel);
+    }
+
+    // Update reducer visibility based on flange sizes
+    document.getElementById('nps-a')?.addEventListener('change', updateReducerVisibility);
+    document.getElementById('nps-b')?.addEventListener('change', updateReducerVisibility);
+
+    // Initial visibility check
+    updateReducerVisibility();
+}
+
+// Update reducer position label
+function updateReducerPositionLabel() {
+    const slider = document.getElementById('reducer-position');
+    const label = document.getElementById('reducer-pos-value');
+    if (slider && label) {
+        label.textContent = Math.round(slider.value * 100) + '%';
+    }
+}
+
+// Show/hide reducer position based on flange sizes
+function updateReducerVisibility() {
+    const npsA = document.getElementById('nps-a')?.value;
+    const npsB = document.getElementById('nps-b')?.value;
+    const reducerGroup = document.getElementById('reducer-position-group');
+
+    if (reducerGroup) {
+        // Show reducer position only if sizes are different
+        const needsReducer = npsA && npsB && npsA !== npsB;
+        reducerGroup.style.display = needsReducer ? 'block' : 'none';
+    }
 }
 
 // Update form visibility based on assembly type
@@ -139,9 +174,17 @@ async function generateAssembly() {
 
         if (assemblyType === 'straight') {
             endpoint = `${API_BASE}/assembly/straight`;
+
+            // Get flange sizes
+            const npsA = document.getElementById('nps-a')?.value || null;
+            const npsB = document.getElementById('nps-b')?.value || null;
+
             payload = {
                 ...commonParams,
-                face_to_face: parseFloat(document.getElementById('face-to-face').value)
+                face_to_face: parseFloat(document.getElementById('face-to-face').value),
+                nps_a: npsA || null,
+                nps_b: npsB || null,
+                reducer_position: parseFloat(document.getElementById('reducer-position')?.value || 0.5)
             };
         } else {
             endpoint = `${API_BASE}/assembly/elbow`;

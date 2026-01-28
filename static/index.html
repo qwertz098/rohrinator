@@ -79,7 +79,51 @@
 
                     <div class="form-group">
                         <label for="face-to-face">Face-to-Face Length (mm)</label>
-                        <input type="number" id="face-to-face" value="500" min="200" max="5000" step="10">
+                        <input type="number" id="face-to-face" value="600" min="200" max="5000" step="10">
+                    </div>
+
+                    <h3>Flange Sizes</h3>
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label for="nps-a">Flange A (NPS)</label>
+                            <select id="nps-a">
+                                <option value="">Same as default</option>
+                                <option value="1">1"</option>
+                                <option value="1-1/4">1-1/4"</option>
+                                <option value="1-1/2">1-1/2"</option>
+                                <option value="2">2"</option>
+                                <option value="2-1/2">2-1/2"</option>
+                                <option value="3">3"</option>
+                                <option value="4" selected>4"</option>
+                                <option value="6">6"</option>
+                                <option value="8">8"</option>
+                            </select>
+                        </div>
+                        <div class="form-group half">
+                            <label for="nps-b">Flange B (NPS)</label>
+                            <select id="nps-b">
+                                <option value="">Same as default</option>
+                                <option value="1">1"</option>
+                                <option value="1-1/4">1-1/4"</option>
+                                <option value="1-1/2">1-1/2"</option>
+                                <option value="2" selected>2"</option>
+                                <option value="2-1/2">2-1/2"</option>
+                                <option value="3">3"</option>
+                                <option value="4">4"</option>
+                                <option value="6">6"</option>
+                                <option value="8">8"</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group" id="reducer-position-group">
+                        <label for="reducer-position">Reducer Position</label>
+                        <input type="range" id="reducer-position" min="0" max="1" step="0.1" value="0.5">
+                        <div class="range-labels">
+                            <span>Near A</span>
+                            <span id="reducer-pos-value">50%</span>
+                            <span>Near B</span>
+                        </div>
                     </div>
                 </div>
 

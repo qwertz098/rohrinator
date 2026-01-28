@@ -63,11 +63,16 @@ class StraightAssemblyRequest(BaseModel):
 
     # Flange parameters
     pressure_class: int = Field(150, description="ASME pressure class (150, 300, 600, 900, 1500, 2500)")
-    nps: str = Field("2", description="Nominal pipe size (e.g., '2', '1/2', '1-1/4')")
+    nps: str = Field("2", description="Default nominal pipe size (e.g., '2', '1/2', '1-1/4')")
+    nps_a: Optional[str] = Field(None, description="NPS for flange A (overrides nps)")
+    nps_b: Optional[str] = Field(None, description="NPS for flange B (overrides nps)")
 
     # Pipe parameters
     pipe_schedule: str = Field("STD", description="Pipe schedule (e.g., 'STD', '40', '80', 'XS')")
     face_to_face: float = Field(500.0, ge=100, le=10000, description="Face-to-face distance in mm")
+
+    # Reducer position (only used when nps_a != nps_b)
+    reducer_position: float = Field(0.5, ge=0, le=1, description="Reducer position (0=near A, 0.5=middle, 1=near B)")
 
     # Options
     welding_gap: float = Field(3.0, ge=0, le=10, description="Welding gap in mm")
@@ -79,11 +84,14 @@ class StraightAssemblyRequest(BaseModel):
             "example": {
                 "project": "Project-001",
                 "designation": "SP-001",
-                "description": "Straight pipe spool NPS 2 Class 150",
+                "description": "Straight pipe spool with reducer NPS 4 to NPS 2",
                 "pressure_class": 150,
                 "nps": "2",
+                "nps_a": "4",
+                "nps_b": "2",
                 "pipe_schedule": "STD",
-                "face_to_face": 500.0,
+                "face_to_face": 600.0,
+                "reducer_position": 0.5,
                 "welding_gap": 3.0,
             }
         }
@@ -198,8 +206,11 @@ async def create_assembly_straight(request: StraightAssemblyRequest):
         assembly = create_straight_assembly(
             pressure_class=request.pressure_class,
             nps=request.nps,
+            nps_a=request.nps_a,
+            nps_b=request.nps_b,
             pipe_schedule=request.pipe_schedule,
             face_to_face=request.face_to_face,
+            reducer_position=request.reducer_position,
             welding_gap=request.welding_gap,
             flange_a_class=request.flange_a_class,
             flange_b_class=request.flange_b_class,
@@ -209,8 +220,11 @@ async def create_assembly_straight(request: StraightAssemblyRequest):
         metadata = get_straight_assembly_metadata(
             pressure_class=request.pressure_class,
             nps=request.nps,
+            nps_a=request.nps_a,
+            nps_b=request.nps_b,
             pipe_schedule=request.pipe_schedule,
             face_to_face=request.face_to_face,
+            reducer_position=request.reducer_position,
             welding_gap=request.welding_gap,
             flange_a_class=request.flange_a_class,
             flange_b_class=request.flange_b_class,
