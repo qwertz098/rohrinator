@@ -28,6 +28,7 @@ from models.straight import create_straight_assembly, get_straight_assembly_meta
 from models.elbow import create_elbow_assembly, get_elbow_assembly_metadata
 from generators.flanges import list_available_flanges
 from generators.pipes import list_available_pipes
+from generators.drawings import create_drawing_dxf, create_drawing_svg
 
 # Create FastAPI app
 app = FastAPI(
@@ -242,6 +243,14 @@ async def create_assembly_straight(request: StraightAssemblyRequest):
         stl_path = assembly_dir / "assembly.stl"
         cq.exporters.export(assembly, str(stl_path), exportType="STL")
 
+        # Generate DXF drawing
+        dxf_path = assembly_dir / "drawing.dxf"
+        title = f"{request.designation or 'Assembly'} - Straight Pipe"
+        create_drawing_dxf(assembly, metadata, str(dxf_path), title=title)
+
+        # Generate SVG preview
+        svg_preview = create_drawing_svg(assembly, metadata)
+
         # Store metadata in cache
         assembly_cache[assembly_id] = {
             "created_at": created_at,
@@ -251,6 +260,9 @@ async def create_assembly_straight(request: StraightAssemblyRequest):
             "metadata": metadata,
             "step_path": str(step_path),
             "stl_path": str(stl_path),
+            "dxf_path": str(dxf_path),
+            "svg_preview": svg_preview,
+            "assembly": assembly,  # Keep for potential re-generation
         }
 
         return AssemblyResponse(
@@ -263,7 +275,9 @@ async def create_assembly_straight(request: StraightAssemblyRequest):
             download_urls={
                 "step": f"/api/v1/assembly/{assembly_id}/step",
                 "stl": f"/api/v1/assembly/{assembly_id}/stl",
+                "dxf": f"/api/v1/assembly/{assembly_id}/dxf",
                 "bom": f"/api/v1/assembly/{assembly_id}/bom",
+                "svg": f"/api/v1/assembly/{assembly_id}/svg",
             },
         )
 
@@ -387,6 +401,40 @@ async def download_stl(assembly_id: str):
         filename=f"{assembly_id}.stl",
         media_type="model/stl",
     )
+
+
+@app.get("/api/v1/assembly/{assembly_id}/dxf", tags=["Download"])
+async def download_dxf(assembly_id: str):
+    """Download DXF 2D drawing for an assembly."""
+    if assembly_id not in assembly_cache:
+        raise HTTPException(status_code=404, detail=f"Assembly {assembly_id} not found")
+
+    dxf_path = assembly_cache[assembly_id].get("dxf_path")
+    if not dxf_path or not os.path.exists(dxf_path):
+        raise HTTPException(status_code=404, detail="DXF file not found")
+
+    designation = assembly_cache[assembly_id].get("designation") or assembly_id
+    filename = f"{designation}_drawing.dxf"
+
+    return FileResponse(
+        path=dxf_path,
+        filename=filename,
+        media_type="application/dxf",
+    )
+
+
+@app.get("/api/v1/assembly/{assembly_id}/svg", tags=["Download"])
+async def get_svg_preview(assembly_id: str):
+    """Get SVG 2D drawing preview for an assembly."""
+    if assembly_id not in assembly_cache:
+        raise HTTPException(status_code=404, detail=f"Assembly {assembly_id} not found")
+
+    svg_preview = assembly_cache[assembly_id].get("svg_preview")
+    if not svg_preview:
+        raise HTTPException(status_code=404, detail="SVG preview not available")
+
+    from fastapi.responses import Response
+    return Response(content=svg_preview, media_type="image/svg+xml")
 
 
 @app.get("/api/v1/assembly/{assembly_id}/bom", tags=["Download"])

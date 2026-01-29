@@ -252,6 +252,9 @@ async function generateAssembly() {
         // Show BOM
         displayBOM(currentAssembly.metadata);
 
+        // Load 2D drawing preview
+        await loadDrawingPreview(currentAssembly.download_urls.svg, currentAssembly.download_urls.dxf);
+
         status.textContent = 'Assembly generated successfully!';
         status.className = 'status success';
 
@@ -406,4 +409,35 @@ function displayBOM(metadata) {
     `;
 
     bomTable.innerHTML = html;
+}
+
+// Load 2D drawing preview
+async function loadDrawingPreview(svgUrl, dxfUrl) {
+    const previewDiv = document.getElementById('drawing-preview');
+    const svgContainer = document.getElementById('svg-container');
+    const dxfLink = document.getElementById('download-dxf');
+
+    if (!svgUrl) {
+        previewDiv.style.display = 'none';
+        return;
+    }
+
+    try {
+        const response = await fetch(svgUrl);
+        if (!response.ok) {
+            throw new Error('Failed to load SVG');
+        }
+
+        const svgContent = await response.text();
+        svgContainer.innerHTML = svgContent;
+        previewDiv.style.display = 'block';
+
+        // Update DXF download link
+        if (dxfUrl && dxfLink) {
+            dxfLink.href = dxfUrl;
+        }
+    } catch (error) {
+        console.error('Error loading drawing preview:', error);
+        previewDiv.style.display = 'none';
+    }
 }

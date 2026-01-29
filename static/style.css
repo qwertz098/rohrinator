@@ -319,6 +319,32 @@ input[type="range"]::-moz-range-thumb {
     margin-bottom: 15px;
 }
 
+/* 2D Drawing Preview */
+.drawing-preview {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #333;
+}
+
+.drawing-preview h3 {
+    font-size: 1rem;
+    color: #4dabf7;
+    margin-bottom: 15px;
+}
+
+#svg-container {
+    background: #1a1a2e;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 15px;
+}
+
+#svg-container svg {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
 #bom-table {
     overflow-x: auto;
 }
