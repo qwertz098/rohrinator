@@ -306,16 +306,15 @@ input[type="range"]::-moz-range-thumb {
     display: none;
 }
 
-/* Assembly Info */
+/* Assembly Info / BOM */
 .assembly-info {
-    margin-top: 30px;
-    background: #16213e;
-    border-radius: 12px;
-    padding: 25px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #333;
 }
 
 .assembly-info h3 {
-    font-size: 1.1rem;
+    font-size: 1rem;
     color: #4dabf7;
     margin-bottom: 15px;
 }
