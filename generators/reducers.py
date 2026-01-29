@@ -65,16 +65,15 @@ def create_concentric_reducer(
     large_wall = (large_od - large_id) / 2
     small_wall = (small_od - small_id) / 2
 
-    # Chamfer calculations
-    large_root_face = min(1.6, large_wall * 0.2)
-    small_root_face = min(1.6, small_wall * 0.2)
+    # Chamfer calculations for weld prep
+    large_root_face = min(1.6, large_wall * 0.25)
+    small_root_face = min(1.6, small_wall * 0.25)
     large_chamfer_depth = large_wall - large_root_face
     small_chamfer_depth = small_wall - small_root_face
-    large_chamfer_height = large_chamfer_depth * math.tan(math.radians(chamfer_angle))
-    small_chamfer_height = small_chamfer_depth * math.tan(math.radians(chamfer_angle))
+    large_chamfer_height = large_chamfer_depth / math.tan(math.radians(chamfer_angle))
+    small_chamfer_height = small_chamfer_depth / math.tan(math.radians(chamfer_angle))
 
-    # Create reducer body by lofting between two circles
-    # Outer profile
+    # Create outer tapered body using loft
     outer = (
         cq.Workplane("XY")
         .circle(large_od / 2)
@@ -83,7 +82,7 @@ def create_concentric_reducer(
         .loft()
     )
 
-    # Inner profile (conical bore)
+    # Create inner tapered bore using loft
     inner = (
         cq.Workplane("XY")
         .circle(large_id / 2)
@@ -92,44 +91,32 @@ def create_concentric_reducer(
         .loft()
     )
 
-    # Create hollow reducer
+    # Hollow out the reducer
     reducer = outer.cut(inner)
 
-    # Add weld prep chamfer at large end (Z=0, facing -Z)
-    # Cut flat and add bevel
-    large_chamfer_cut = (
-        cq.Workplane("XY")
-        .circle(large_od / 2 + 1)
-        .circle(large_id / 2 + large_root_face)
-        .extrude(-large_chamfer_height - welding_gap / 2)
-    )
-    large_bevel = (
-        cq.Workplane("XY")
-        .transformed(offset=(0, 0, -welding_gap / 2))
-        .circle(large_od / 2)
-        .workplane(offset=-large_chamfer_height)
-        .circle(large_id / 2 + large_root_face)
-        .loft()
-    )
-    reducer = reducer.cut(large_chamfer_cut).union(large_bevel)
+    # Add weld prep chamfer at large end (Z=0)
+    # Create a chamfer by cutting a cone shape from the outside
+    if large_chamfer_height > 0.1:
+        large_chamfer = (
+            cq.Workplane("XY")
+            .circle(large_od / 2 + 1)  # Slightly larger to ensure full cut
+            .workplane(offset=large_chamfer_height)
+            .circle(large_id / 2 + large_root_face)
+            .loft()
+        )
+        reducer = reducer.cut(large_chamfer)
 
-    # Add weld prep chamfer at small end (Z=H, facing +Z)
-    small_chamfer_cut = (
-        cq.Workplane("XY")
-        .transformed(offset=(0, 0, H))
-        .circle(small_od / 2 + 1)
-        .circle(small_id / 2 + small_root_face)
-        .extrude(small_chamfer_height + welding_gap / 2)
-    )
-    small_bevel = (
-        cq.Workplane("XY")
-        .transformed(offset=(0, 0, H + welding_gap / 2))
-        .circle(small_od / 2)
-        .workplane(offset=small_chamfer_height)
-        .circle(small_id / 2 + small_root_face)
-        .loft()
-    )
-    reducer = reducer.cut(small_chamfer_cut).union(small_bevel)
+    # Add weld prep chamfer at small end (Z=H)
+    if small_chamfer_height > 0.1:
+        small_chamfer = (
+            cq.Workplane("XY")
+            .transformed(offset=(0, 0, H))
+            .circle(small_od / 2 + 1)  # Slightly larger
+            .workplane(offset=-small_chamfer_height)
+            .circle(small_id / 2 + small_root_face)
+            .loft()
+        )
+        reducer = reducer.cut(small_chamfer)
 
     return reducer
 
@@ -195,4 +182,5 @@ if __name__ == "__main__":
     out_dir = Path(__file__).parent.parent / "parts"
     os.makedirs(out_dir, exist_ok=True)
     cq.exporters.export(reducer, str(out_dir / "reducer_4x2.step"), exportType="STEP")
+    cq.exporters.export(reducer, str(out_dir / "reducer_4x2.stl"), exportType="STL")
     print(f"Exported to {out_dir / 'reducer_4x2.step'}")

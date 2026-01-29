@@ -3,9 +3,9 @@ Straight Pipe Assembly Generator
 
 Creates a straight pipe assembly consisting of:
 - Flange A (start)
-- Pipe section A (if different sizes, before reducer)
+- Pipe section A (optional, if reducer not at position 0)
 - Concentric reducer (if different flange sizes)
-- Pipe section B (if different sizes, after reducer)
+- Pipe section B (optional, if reducer not at position 1)
 - Flange B (end)
 
 The assembly is oriented along the Z axis with Flange A at Z=0
@@ -54,6 +54,8 @@ def create_straight_assembly(
     Create a straight pipe assembly with two flanges.
 
     If nps_a and nps_b are different, a concentric reducer is included.
+    When reducer_position is 0, the reducer connects directly to flange A (no pipe A).
+    When reducer_position is 1, the reducer connects directly to flange B (no pipe B).
 
     Args:
         pressure_class: Default ASME pressure class for both flanges
@@ -62,7 +64,7 @@ def create_straight_assembly(
         nps_b: Nominal pipe size for flange B (e.g., "2")
         pipe_schedule: Pipe schedule (e.g., "STD", "40", "80")
         face_to_face: Distance between flange faces (mm)
-        reducer_position: Position of reducer (0.0-1.0), relative to pipe length
+        reducer_position: Position of reducer (0.0-1.0), 0=at flange A, 1=at flange B
         welding_gap: Gap between parts for welding (mm)
         flange_a_class: Override pressure class for flange A
         flange_b_class: Override pressure class for flange B
@@ -110,16 +112,33 @@ def create_straight_assembly(
             large_nps, small_nps = size_b, size_a
         reducer_length = get_reducer_length(large_nps, small_nps)
 
+    # Determine if we have direct connections (no pipe section)
+    # Tolerance for "at flange" position
+    direct_to_a = needs_reducer and reducer_position <= 0.01  # Position 0
+    direct_to_b = needs_reducer and reducer_position >= 0.99  # Position 1
+
+    # Calculate number of welding gaps
+    if needs_reducer:
+        if direct_to_a and direct_to_b:
+            # Both direct - shouldn't happen normally, but handle it
+            num_gaps = 2
+        elif direct_to_a or direct_to_b:
+            # One direct connection - 3 gaps (flange-reducer-pipe-flange or flange-pipe-reducer-flange)
+            num_gaps = 3
+        else:
+            # Normal case - 4 gaps (flange-pipe-reducer-pipe-flange)
+            num_gaps = 4
+    else:
+        num_gaps = 2  # Simple case: flange-pipe-flange
+
     # Calculate available pipe space
     total_flange_space = flange_a_total + flange_b_total
     if needs_reducer:
-        # Space for reducer plus 2 more welding gaps (4 total)
-        min_required = total_flange_space + reducer_length + 4 * welding_gap + 50
-        available_pipe_space = face_to_face - total_flange_space - reducer_length - 4 * welding_gap
+        available_pipe_space = face_to_face - total_flange_space - reducer_length - num_gaps * welding_gap
     else:
-        # Simple case: 2 welding gaps
-        min_required = total_flange_space + 2 * welding_gap + 50
-        available_pipe_space = face_to_face - total_flange_space - 2 * welding_gap
+        available_pipe_space = face_to_face - total_flange_space - num_gaps * welding_gap
+
+    min_required = total_flange_space + (reducer_length if needs_reducer else 0) + num_gaps * welding_gap + 20
 
     if available_pipe_space < 0:
         raise ValueError(
@@ -148,32 +167,32 @@ def create_straight_assembly(
 
     if needs_reducer:
         # Calculate pipe lengths based on reducer position
-        # reducer_position: 0 = right after flange A, 1 = right before flange B
-        pipe_a_length = available_pipe_space * reducer_position
-        pipe_b_length = available_pipe_space * (1 - reducer_position)
+        if direct_to_a:
+            pipe_a_length = 0
+            pipe_b_length = available_pipe_space
+        elif direct_to_b:
+            pipe_a_length = available_pipe_space
+            pipe_b_length = 0
+        else:
+            # Normal distribution
+            pipe_a_length = available_pipe_space * reducer_position
+            pipe_b_length = available_pipe_space * (1 - reducer_position)
 
-        # Ensure minimum pipe lengths
-        min_pipe_len = 20
-        if pipe_a_length < min_pipe_len:
-            pipe_a_length = min_pipe_len
-            pipe_b_length = available_pipe_space - min_pipe_len
-        if pipe_b_length < min_pipe_len:
-            pipe_b_length = min_pipe_len
-            pipe_a_length = available_pipe_space - min_pipe_len
+        # Current Z position tracker
+        current_z = flange_a_total + welding_gap
 
-        # 2. Pipe A (large diameter side)
-        pipe_a_start = flange_a_total + welding_gap
+        # 2. Pipe A (if not direct connection to flange A)
         if pipe_a_length > 0:
             pipe_a = create_pipe_section_simple(
                 od=pipe_dims_a["od"],
                 id_=pipe_dims_a["id"],
                 length=pipe_a_length,
             )
-            pipe_a = pipe_a.translate((0, 0, pipe_a_start))
+            pipe_a = pipe_a.translate((0, 0, current_z))
             parts.append(pipe_a)
+            current_z += pipe_a_length + welding_gap
 
         # 3. Reducer
-        # Determine orientation based on which end is larger
         if pipe_dims_a["od"] > pipe_dims_b["od"]:
             # A is larger, reducer large end at flange A side
             reducer = create_concentric_reducer(
@@ -183,9 +202,6 @@ def create_straight_assembly(
                 small_schedule=pipe_schedule,
                 welding_gap=welding_gap,
             )
-            # Reducer: large at Z=0, small at Z=H
-            # Position so large end connects to pipe A
-            reducer_z = pipe_a_start + pipe_a_length + welding_gap
         else:
             # B is larger, need to flip reducer
             reducer = create_concentric_reducer(
@@ -198,20 +214,19 @@ def create_straight_assembly(
             # Flip reducer so small end is at flange A side
             reducer = reducer.rotate((0, 0, 0), (1, 0, 0), 180)
             reducer = reducer.translate((0, 0, reducer_length))
-            reducer_z = pipe_a_start + pipe_a_length + welding_gap
 
-        reducer = reducer.translate((0, 0, reducer_z))
+        reducer = reducer.translate((0, 0, current_z))
         parts.append(reducer)
+        current_z += reducer_length + welding_gap
 
-        # 4. Pipe B (small diameter side)
-        pipe_b_start = reducer_z + reducer_length + welding_gap
+        # 4. Pipe B (if not direct connection to flange B)
         if pipe_b_length > 0:
             pipe_b = create_pipe_section_simple(
                 od=pipe_dims_b["od"],
                 id_=pipe_dims_b["id"],
                 length=pipe_b_length,
             )
-            pipe_b = pipe_b.translate((0, 0, pipe_b_start))
+            pipe_b = pipe_b.translate((0, 0, current_z))
             parts.append(pipe_b)
 
     else:
@@ -317,31 +332,48 @@ def get_straight_assembly_metadata(
             large_nps, small_nps = size_b, size_a
 
         reducer_len = get_reducer_length(large_nps, small_nps)
-        available = face_to_face - flange_a_total - flange_b_total - reducer_len - 4 * welding_gap
 
-        pipe_a_length = max(20, available * reducer_position)
-        pipe_b_length = max(20, available * (1 - reducer_position))
+        # Determine direct connections
+        direct_to_a = reducer_position <= 0.01
+        direct_to_b = reducer_position >= 0.99
 
-        # Adjust if needed
-        if pipe_a_length + pipe_b_length > available:
+        # Calculate number of gaps
+        if direct_to_a and direct_to_b:
+            num_gaps = 2
+        elif direct_to_a or direct_to_b:
+            num_gaps = 3
+        else:
+            num_gaps = 4
+
+        available = face_to_face - flange_a_total - flange_b_total - reducer_len - num_gaps * welding_gap
+
+        # Calculate pipe lengths
+        if direct_to_a:
+            pipe_a_length = 0
+            pipe_b_length = available
+        elif direct_to_b:
+            pipe_a_length = available
+            pipe_b_length = 0
+        else:
             pipe_a_length = available * reducer_position
-            pipe_b_length = available - pipe_a_length
+            pipe_b_length = available * (1 - reducer_position)
 
-        # Pipe A
-        weight_pa = pipe_weight(pipe_dims_a["od"], pipe_dims_a["id"], pipe_a_length)
-        total_weight += weight_pa
-        components.append({
-            "item": item,
-            "type": "pipe_section",
-            "description": f"Pipe A - ASME B36.10 NPS {size_a} Sch {pipe_schedule}",
-            "standard": "ASME B36.10",
-            "nps": size_a,
-            "schedule": pipe_schedule,
-            "length_mm": round(pipe_a_length, 1),
-            "quantity": 1,
-            "weight_kg": round(weight_pa, 2),
-        })
-        item += 1
+        # Pipe A (only if length > 0)
+        if pipe_a_length > 0:
+            weight_pa = pipe_weight(pipe_dims_a["od"], pipe_dims_a["id"], pipe_a_length)
+            total_weight += weight_pa
+            components.append({
+                "item": item,
+                "type": "pipe_section",
+                "description": f"Pipe A - ASME B36.10 NPS {size_a} Sch {pipe_schedule}",
+                "standard": "ASME B36.10",
+                "nps": size_a,
+                "schedule": pipe_schedule,
+                "length_mm": round(pipe_a_length, 1),
+                "quantity": 1,
+                "weight_kg": round(weight_pa, 2),
+            })
+            item += 1
 
         # Reducer
         reducer_meta = get_reducer_metadata(large_nps, small_nps, pipe_schedule, pipe_schedule)
@@ -359,21 +391,22 @@ def get_straight_assembly_metadata(
         })
         item += 1
 
-        # Pipe B
-        weight_pb = pipe_weight(pipe_dims_b["od"], pipe_dims_b["id"], pipe_b_length)
-        total_weight += weight_pb
-        components.append({
-            "item": item,
-            "type": "pipe_section",
-            "description": f"Pipe B - ASME B36.10 NPS {size_b} Sch {pipe_schedule}",
-            "standard": "ASME B36.10",
-            "nps": size_b,
-            "schedule": pipe_schedule,
-            "length_mm": round(pipe_b_length, 1),
-            "quantity": 1,
-            "weight_kg": round(weight_pb, 2),
-        })
-        item += 1
+        # Pipe B (only if length > 0)
+        if pipe_b_length > 0:
+            weight_pb = pipe_weight(pipe_dims_b["od"], pipe_dims_b["id"], pipe_b_length)
+            total_weight += weight_pb
+            components.append({
+                "item": item,
+                "type": "pipe_section",
+                "description": f"Pipe B - ASME B36.10 NPS {size_b} Sch {pipe_schedule}",
+                "standard": "ASME B36.10",
+                "nps": size_b,
+                "schedule": pipe_schedule,
+                "length_mm": round(pipe_b_length, 1),
+                "quantity": 1,
+                "weight_kg": round(weight_pb, 2),
+            })
+            item += 1
 
     else:
         # Single pipe
@@ -416,6 +449,8 @@ def get_straight_assembly_metadata(
             "nps_b": size_b,
             "has_reducer": needs_reducer,
             "reducer_position": reducer_position if needs_reducer else None,
+            "direct_to_flange_a": needs_reducer and reducer_position <= 0.01,
+            "direct_to_flange_b": needs_reducer and reducer_position >= 0.99,
             "welding_gap": welding_gap,
         },
         "components": components,
