@@ -18,8 +18,6 @@ if str(_SCRIPT_DIR) not in sys.path:
 
 import ezdxf
 from ezdxf import units
-from ezdxf.addons.drawing import Frontend, RenderContext
-from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
 import cadquery as cq
 
 
